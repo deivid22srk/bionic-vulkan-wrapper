@@ -24,13 +24,14 @@ jobs:
           libxcb-glx0-dev libxcb-dri2-0-dev libxcb-dri3-dev \
           libxcb-present-dev libxcb-sync-dev libxshmfence-dev \
           libxxf86vm-dev libxrandr-dev libwayland-dev wayland-protocols \
-          libzstd-dev libexpat1-dev libvulkan-dev
+          libzstd-dev libexpat1-dev libvulkan-dev \
+          glslang-tools libglvnd-dev libvdpau-dev
 
     - name: Configurar build
       run: |
         mkdir build
         cd build
-        meson ..
+        meson setup ..
 
     - name: Compilar
       run: |
