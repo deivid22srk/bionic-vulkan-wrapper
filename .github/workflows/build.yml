@@ -26,8 +26,12 @@ jobs:
           libxxf86vm-dev libxrandr-dev libwayland-dev wayland-protocols \
           libzstd-dev libexpat1-dev libvulkan-dev \
           glslang-tools libglvnd-dev libvdpau-dev \
-          libclc-17-dev bison flex llvm-dev clang zlib1g-dev \
-          libdrm-dev
+          libclc-17-dev bison flex \
+          llvm-18 llvm-18-dev llvm-18-tools clang-18 zlib1g-dev \
+          libdrm-dev llvm-spirv \
+          libomxil-bellagio-dev libtizonia-dev libtizplatform-dev \
+          libva-dev libudev-dev
+        export LLVM_CONFIG=/usr/bin/llvm-config-18
 
     - name: Configurar build
       run: |
