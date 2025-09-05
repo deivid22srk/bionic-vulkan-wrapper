@@ -22,9 +22,9 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y \
           meson ninja-build python3-mako python3-pip \
-          libx11-dev libxext-dev libxdamage-dev libxfixes-dev \
+          libx11-dev libx11-xcb-dev libxext-dev libxdamage-dev libxfixes-dev \
           libxcb-glx0-dev libxcb-dri2-0-dev libxcb-dri3-dev \
-          libxcb-present-dev libxcb-sync-dev libxshmfence-dev \
+          libxcb-present-dev libxcb-sync-dev libxcb-shm0-dev libxshmfence-dev \
           libxxf86vm-dev libxrandr-dev libwayland-dev wayland-protocols \
           libzstd-dev libexpat1-dev libvulkan-dev \
           glslang-tools libglvnd-dev libvdpau-dev libdrm-dev
