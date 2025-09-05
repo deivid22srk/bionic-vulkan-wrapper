@@ -25,7 +25,8 @@ jobs:
           libxcb-present-dev libxcb-sync-dev libxshmfence-dev \
           libxxf86vm-dev libxrandr-dev libwayland-dev wayland-protocols \
           libzstd-dev libexpat1-dev libvulkan-dev \
-          glslang-tools libglvnd-dev libvdpau-dev
+          glslang-tools libglvnd-dev libvdpau-dev \
+          libclc-dev bison flex llvm-dev clang zlib1g-dev
 
     - name: Configurar build
       run: |
