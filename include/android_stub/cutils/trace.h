@@ -18,7 +18,12 @@
 #define _LIBS_CUTILS_TRACE_H
 
 #include <inttypes.h>
+#if defined(__cplusplus)
+#include <atomic>
+using atomic_bool = std::atomic_bool;
+#else
 #include <stdatomic.h>
+#endif
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>

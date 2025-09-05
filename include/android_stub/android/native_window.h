@@ -36,6 +36,10 @@
 #include <stdint.h>
 #include <sys/cdefs.h>
 
+#if !defined(__BIONIC__) && !defined(__INTRODUCED_IN)
+#define __INTRODUCED_IN(x)
+#endif
+
 #include <android/data_space.h>
 #include <android/hardware_buffer.h>
 #include <android/rect.h>

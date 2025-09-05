@@ -49,6 +49,10 @@
 
 #include <sys/cdefs.h>
 
+#if !defined(__BIONIC__) && !defined(__INTRODUCED_IN)
+#define __INTRODUCED_IN(x)
+#endif
+
 #include <android/rect.h>
 
 __BEGIN_DECLS
