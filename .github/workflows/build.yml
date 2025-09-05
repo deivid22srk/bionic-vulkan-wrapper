@@ -3,9 +3,11 @@ name: Build Mesa Fork
 on:
   workflow_dispatch:   # permite rodar manualmente
   push:
-    branches: [ "main" ]
+    branches:
+      - "**"
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - "**"
 
 jobs:
   build:
