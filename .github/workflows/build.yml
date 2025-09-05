@@ -27,7 +27,7 @@ jobs:
           libzstd-dev libexpat1-dev libvulkan-dev \
           glslang-tools libglvnd-dev libvdpau-dev \
           libclc-17-dev bison flex llvm-dev clang zlib1g-dev \
-          libdrm-dev libdrm-intel-dev libdrm-radeon-dev libdrm-amdgpu-dev libdrm-nouveau-dev
+          libdrm-dev
 
     - name: Configurar build
       run: |
