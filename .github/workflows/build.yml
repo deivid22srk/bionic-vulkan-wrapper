@@ -31,7 +31,17 @@ jobs:
       run: |
         mkdir build
         cd build
-        meson setup ..
+        meson setup .. \
+          -Dvulkan-drivers=wrapper \
+          -Dgallium-drivers= \
+          -Dgallium-opencl=disabled \
+          -Dgallium-rusticl=false \
+          -Dopencl-spirv=false \
+          -Dopengl=false \
+          -Dgles1=disabled \
+          -Dgles2=disabled \
+          -Degl=disabled \
+          -Dglx=disabled
 
     - name: Compilar
       run: |
