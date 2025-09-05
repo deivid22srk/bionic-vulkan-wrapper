@@ -31,8 +31,13 @@ jobs:
         cd build
         meson ..
 
-    - name: Compilar e instalar
+    - name: Compilar
       run: |
         cd build
         ninja
-        sudo ninja install
+
+    - name: Upload artefato compilado
+      uses: actions/upload-artifact@v3
+      with:
+        name: mesa-build
+        path: build/
