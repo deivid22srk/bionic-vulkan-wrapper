@@ -1,6 +1,7 @@
 name: Build Mesa Fork
 
 on:
+  workflow_dispatch:   # permite rodar manualmente no botão "Run workflow"
   push:
     branches: [ "main" ]
   pull_request:
@@ -36,8 +37,13 @@ jobs:
         cd build
         ninja
 
-    - name: Upload artefato compilado
+    - name: Empacotar em tar.gz
+      run: |
+        cd build
+        tar -czvf mesa-build.tar.gz *
+
+    - name: Upload artefato
       uses: actions/upload-artifact@v3
       with:
         name: mesa-build
-        path: build/
+        path: build/mesa-build.tar.gz
