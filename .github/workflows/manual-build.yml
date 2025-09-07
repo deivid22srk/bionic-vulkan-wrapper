@@ -1,6 +1,5 @@
 name: Vulkan Wrapper Build
 
-# Dispara o workflow em qualquer push, PR ou manualmente
 on:
   push:
     branches: ["*"]
@@ -22,39 +21,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout do código da branch atual
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. Instalar dependências do sistema (Ubuntu)
       - name: Install system dependencies
         run: |
           sudo apt update
           sudo apt install -y python3 python3-pip git ninja-build meson clang libx11-dev libxcb1-dev xorg-dev
 
-      # 3. Instalar Meson via pip (garante versão mais nova)
       - name: Install Meson
-        run: |
-          pip install --upgrade meson
+        run: pip install --upgrade meson
 
-      # 4. Criar diretório de build
       - name: Create build directory
         run: mkdir -p build
 
-      # 5. Configurar build com Meson
       - name: Configure build
-        run: |
-          meson setup build --buildtype=${{ github.event.inputs.build_type }} ..
+        run: meson setup build .. --buildtype=${{ github.event.inputs.build_type }}
 
-      # 6. Compilar com Ninja
       - name: Build
         run: ninja -C build
 
-      # 7. Instalar (opcional)
       - name: Install
         run: sudo ninja -C build install
 
-      # 8. Upload dos artefatos compilados
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
