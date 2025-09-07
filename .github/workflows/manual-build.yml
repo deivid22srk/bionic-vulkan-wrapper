@@ -6,10 +6,20 @@ on:
   pull_request:
     branches: ['*']
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Tipo de build'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
 
 jobs:
   build-wrapper:
     runs-on: ubuntu-latest
+
     steps:
       # 1. Checkout do repositório atual
       - name: Checkout repo
@@ -33,7 +43,7 @@ jobs:
         run: |
           cd bionic-vulkan-wrapper
           mkdir -p build && cd build
-          meson ..
+          meson .. --buildtype=${{ github.event.inputs.build_type }}
 
       # 5. Compilar com Ninja
       - name: Build wrapper
