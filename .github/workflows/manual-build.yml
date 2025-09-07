@@ -36,7 +36,7 @@ jobs:
         run: mkdir -p build
 
       - name: Configure build
-        run: meson setup build .. --buildtype=${{ github.event.inputs.build_type }}
+        run: meson setup build . --buildtype=${{ github.event.inputs.build_type }}
 
       - name: Build
         run: ninja -C build
