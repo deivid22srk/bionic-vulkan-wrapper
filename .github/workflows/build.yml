@@ -109,13 +109,29 @@ jobs:
     - name: Create Android Cross File
       run: |
         API_LEVEL="${{ github.event.inputs.android_api || '28' }}"
+        NDK_ROOT="${ANDROID_NDK_ROOT:-${ANDROID_NDK_LATEST_HOME}}"
         
-        cat > android-cross-${{ matrix.config.abi }}.txt << 'EOF'
+        # Verify NDK exists
+        if [ ! -d "$NDK_ROOT" ]; then
+          echo "Error: Android NDK not found at $NDK_ROOT"
+          exit 1
+        fi
+        
+        # Verify compiler exists
+        COMPILER="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.config.target }}${API_LEVEL}-clang"
+        if [ ! -f "$COMPILER" ]; then
+          echo "Error: Compiler not found: $COMPILER"
+          echo "Available compilers:"
+          ls -la "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.config.target }}"*-clang* || true
+          exit 1
+        fi
+        
+        cat > android-cross-${{ matrix.config.abi }}.txt << EOF
         [binaries]
-        c = '${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.config.target }}${API_LEVEL}-clang'
-        cpp = '${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.config.target }}${API_LEVEL}-clang++'
-        ar = '${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar'
-        strip = '${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'
+        c = '$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.config.target }}${API_LEVEL}-clang'
+        cpp = '$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.config.target }}${API_LEVEL}-clang++'
+        ar = '$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar'
+        strip = '$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'
         pkgconfig = 'pkg-config'
         
         [host_machine]
@@ -125,10 +141,10 @@ jobs:
         endian = 'little'
         
         [built-in options]
-        c_args = ['-fPIC', '-fstack-protector-strong', '-ffunction-sections', '-fdata-sections']
-        cpp_args = ['-fPIC', '-fstack-protector-strong', '-ffunction-sections', '-fdata-sections']  
-        c_link_args = ['-Wl,--gc-sections', '-Wl,--as-needed']
-        cpp_link_args = ['-Wl,--gc-sections', '-Wl,--as-needed']
+        c_args = ['-fPIC', '-fstack-protector-strong', '-ffunction-sections', '-fdata-sections', '-Os']
+        cpp_args = ['-fPIC', '-fstack-protector-strong', '-ffunction-sections', '-fdata-sections', '-Os']  
+        c_link_args = ['-Wl,--gc-sections', '-Wl,--as-needed', '-Wl,--strip-all']
+        cpp_link_args = ['-Wl,--gc-sections', '-Wl,--as-needed', '-Wl,--strip-all']
         EOF
         
         echo "Created cross-compilation file:"
