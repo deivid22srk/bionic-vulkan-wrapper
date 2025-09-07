@@ -28,12 +28,15 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y \
-            python3 python3-pip git ninja-build meson clang \
+            python3 python3-pip python3-setuptools python3-venv python3-dev python3-wheel python3-mako \
+            git ninja-build meson clang pkg-config \
             libx11-dev libxcb1-dev xorg-dev glslang-tools \
             libclc-20-dev
 
-      - name: Install Meson
-        run: pip install --upgrade meson
+      - name: Upgrade pip and Meson
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install --upgrade meson
 
       - name: Create build directory
         run: mkdir -p build
