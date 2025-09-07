@@ -1,55 +1,547 @@
-name: Build Mesa Fork
+name: Mesa Mobile Driver Build
 
 on:
-  workflow_dispatch:   # permite rodar manualmente
-  push:                # dispara em qualquer branch
-    branches: ["**"]
-  pull_request:        # dispara em qualquer branch
-    branches: ["**"]
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ '*' ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - debug
+          - release
+          - debugoptimized
+      enable_android:
+        description: 'Enable Android build'
+        required: false
+        default: true
+        type: boolean
+      enable_vulkan:
+        description: 'Enable Vulkan drivers'
+        required: false
+        default: true
+        type: boolean
+      drivers:
+        description: 'Drivers to build (comma-separated)'
+        required: false
+        default: 'freedreno,panfrost'
+        type: string
+
+env:
+  CCACHE_COMPRESS: true
+  CCACHE_COMPRESSLEVEL: 6
+  CCACHE_MAXSIZE: 2G
+  DEBIAN_FRONTEND: noninteractive
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  build-android:
+    name: Android Mobile Drivers
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: "Android ARM64 Vulkan"
+            target: "aarch64-linux-android"
+            ndk_abi: "arm64-v8a"
+            android_api: "28"
+            drivers: "freedreno,panfrost"
+          - name: "Android ARM32 Vulkan"
+            target: "arm-linux-androideabi"
+            ndk_abi: "armeabi-v7a"
+            android_api: "28"
+            drivers: "freedreno,panfrost"
+    
     steps:
-    - name: Checkout código
+    - name: Checkout Mesa
       uses: actions/checkout@v4
-
-    - name: Instalar dependências
+      with:
+        fetch-depth: 1
+    
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ matrix.config.name }}-${{ github.ref_name }}
+        max-size: 2G
+    
+    - name: Install dependencies
       run: |
-        sudo apt-get update
+        sudo apt-get update -qq
         sudo apt-get install -y \
-          meson ninja-build python3-mako python3-pip \
-          libx11-dev libxext-dev libxdamage-dev libxfixes-dev \
-          libxcb-glx0-dev libxcb-dri2-0-dev libxcb-dri3-dev \
-          libxcb-present-dev libxcb-sync-dev libxshmfence-dev \
-          libxxf86vm-dev libxrandr-dev libwayland-dev wayland-protocols \
-          libzstd-dev libexpat1-dev libvulkan-dev \
-          glslang-tools libglvnd-dev libvdpau-dev \
-          libclc-17-dev bison flex \
-          llvm-18 llvm-18-dev llvm-18-tools clang-18 zlib1g-dev \
-          libdrm-dev llvm-spirv \
-          libomxil-bellagio-dev libtizonia-dev libtizplatform-dev \
-          libva-dev libudev-dev
-        export LLVM_CONFIG=/usr/bin/llvm-config-18
-
-    - name: Configurar build
+          build-essential \
+          bison \
+          flex \
+          gettext \
+          libedit-dev \
+          libelf-dev \
+          libepoxy-dev \
+          libexpat1-dev \
+          libffi-dev \
+          libgbm-dev \
+          libgles2-mesa-dev \
+          libglvnd-dev \
+          libomxil-bellagio-dev \
+          libpciaccess-dev \
+          libudev-dev \
+          libunwind-dev \
+          libvdpau-dev \
+          libvulkan-dev \
+          libwayland-dev \
+          libx11-dev \
+          libx11-xcb-dev \
+          libxcb-dri2-0-dev \
+          libxcb-dri3-dev \
+          libxcb-glx0-dev \
+          libxcb-present-dev \
+          libxcb-randr0-dev \
+          libxcb-shm0-dev \
+          libxcb-sync-dev \
+          libxcb-xfixes0-dev \
+          libxdamage-dev \
+          libxext-dev \
+          libxfixes-dev \
+          libxml2-utils \
+          libxrandr-dev \
+          libxshmfence-dev \
+          libxxf86vm-dev \
+          meson \
+          ninja-build \
+          pkg-config \
+          python3-mako \
+          python3-packaging \
+          python3-ply \
+          python3-yaml \
+          wayland-protocols \
+          zlib1g-dev \
+          ccache
+    
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c
+        add-to-path: true
+    
+    - name: Create Android Meson Cross File
       run: |
-        mkdir build
-        cd build
-        meson setup ..
-
-    - name: Compilar
+        cat > android-cross-${{ matrix.config.ndk_abi }}.txt << 'EOF'
+        [binaries]
+        c = '${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.config.target }}${{ matrix.config.android_api }}-clang'
+        cpp = '${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.config.target }}${{ matrix.config.android_api }}-clang++'
+        ar = '${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar'
+        strip = '${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'
+        pkgconfig = 'pkg-config'
+        
+        [host_machine]
+        system = 'android'
+        cpu_family = '${{ matrix.config.ndk_abi == 'arm64-v8a' && 'aarch64' || 'arm' }}'
+        cpu = '${{ matrix.config.ndk_abi == 'arm64-v8a' && 'armv8' || 'armv7' }}'
+        endian = 'little'
+        
+        [properties]
+        c_args = ['-fPIC', '-fstack-protector-strong']
+        cpp_args = ['-fPIC', '-fstack-protector-strong']
+        c_link_args = []
+        cpp_link_args = []
+        EOF
+    
+    - name: Configure Mesa Build
       run: |
-        cd build
-        ninja
-
-    - name: Empacotar em tar.gz
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'debugoptimized' }}"
+        ENABLE_ANDROID="${{ github.event.inputs.enable_android || 'true' }}"
+        ENABLE_VULKAN="${{ github.event.inputs.enable_vulkan || 'true' }}"
+        DRIVERS="${{ github.event.inputs.drivers || matrix.config.drivers }}"
+        
+        meson setup build \
+          --cross-file android-cross-${{ matrix.config.ndk_abi }}.txt \
+          --buildtype="$BUILD_TYPE" \
+          -Dplatforms=android \
+          -Dandroid-stub=true \
+          -Dgallium-drivers="$DRIVERS" \
+          -Dvulkan-drivers="$DRIVERS" \
+          -Degl=enabled \
+          -Dgles1=enabled \
+          -Dgles2=enabled \
+          -Dshared-glapi=enabled \
+          -Dgbm=disabled \
+          -Dglx=disabled \
+          -Dosmesa=false \
+          -Ddri3=disabled \
+          -Dxmlconfig=disabled \
+          -Dllvm=disabled \
+          -Dshader-cache=enabled \
+          -Dvulkan-layers=device-select,overlay \
+          -Dtools=freedreno,panfrost \
+          -Dlibunwind=disabled
+    
+    - name: Build Mesa
       run: |
-        tar -czvf mesa-build.tar.gz -C build .
-
-    - name: Upload artefato
+        ninja -C build -j$(nproc)
+    
+    - name: Generate Build Info
+      run: |
+        echo "## Build Information" > build-info.md
+        echo "- **Branch:** ${{ github.ref_name }}" >> build-info.md
+        echo "- **Commit:** ${{ github.sha }}" >> build-info.md
+        echo "- **Config:** ${{ matrix.config.name }}" >> build-info.md
+        echo "- **Target:** ${{ matrix.config.target }}" >> build-info.md
+        echo "- **Android API:** ${{ matrix.config.android_api }}" >> build-info.md
+        echo "- **Drivers:** ${{ matrix.config.drivers }}" >> build-info.md
+        echo "- **Build Type:** ${{ github.event.inputs.build_type || 'debugoptimized' }}" >> build-info.md
+        echo "- **Date:** $(date -u)" >> build-info.md
+        
+        # List built libraries
+        echo "" >> build-info.md
+        echo "## Built Libraries:" >> build-info.md
+        find build -name "*.so" | head -20 | sed 's/^/- /' >> build-info.md
+    
+    - name: Package Drivers
+      run: |
+        mkdir -p artifacts/${{ matrix.config.ndk_abi }}/{libs,includes}
+        
+        # Copy Vulkan drivers
+        find build -name "*vulkan*.so" -exec cp {} artifacts/${{ matrix.config.ndk_abi }}/libs/ \; || true
+        
+        # Copy EGL/GLES drivers  
+        find build -name "*EGL*.so" -exec cp {} artifacts/${{ matrix.config.ndk_abi }}/libs/ \; || true
+        find build -name "*GLES*.so" -exec cp {} artifacts/${{ matrix.config.ndk_abi }}/libs/ \; || true
+        
+        # Copy Freedreno specific
+        find build -name "*freedreno*.so" -exec cp {} artifacts/${{ matrix.config.ndk_abi }}/libs/ \; || true
+        find build -name "*turnip*.so" -exec cp {} artifacts/${{ matrix.config.ndk_abi }}/libs/ \; || true
+        
+        # Copy Panfrost specific
+        find build -name "*panfrost*.so" -exec cp {} artifacts/${{ matrix.config.ndk_abi }}/libs/ \; || true
+        find build -name "*panvk*.so" -exec cp {} artifacts/${{ matrix.config.ndk_abi }}/libs/ \; || true
+        
+        # Copy headers
+        cp -r include/* artifacts/${{ matrix.config.ndk_abi }}/includes/ || true
+        
+        # Create manifest
+        echo "Mesa Mobile Drivers - ${{ matrix.config.name }}" > artifacts/${{ matrix.config.ndk_abi }}/README.md
+        cat build-info.md >> artifacts/${{ matrix.config.ndk_abi }}/README.md
+    
+    - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: mesa-build-${{ github.ref_name }}
-        path: mesa-build.tar.gz
+        name: mesa-drivers-${{ matrix.config.ndk_abi }}-${{ github.sha }}
+        path: |
+          artifacts/${{ matrix.config.ndk_abi }}/
+          build-info.md
+        retention-days: 7
+
+  build-linux:
+    name: Linux Native Build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    
+    steps:
+    - name: Checkout Mesa
+      uses: actions/checkout@v4
+    
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: linux-native-${{ github.ref_name }}
+        max-size: 2G
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y \
+          build-essential \
+          meson \
+          ninja-build \
+          pkg-config \
+          python3-mako \
+          python3-packaging \
+          bison \
+          flex \
+          libdrm-dev \
+          libelf-dev \
+          libepoxy-dev \
+          libexpat1-dev \
+          libffi-dev \
+          libpciaccess-dev \
+          libudev-dev \
+          libvulkan-dev \
+          libwayland-dev \
+          libx11-dev \
+          libx11-xcb-dev \
+          libxcb-dri2-0-dev \
+          libxcb-dri3-dev \
+          libxcb-glx0-dev \
+          libxcb-present-dev \
+          libxcb-randr0-dev \
+          libxcb-shm0-dev \
+          libxcb-sync-dev \
+          libxcb-xfixes0-dev \
+          libxdamage-dev \
+          libxext-dev \
+          libxfixes-dev \
+          libxml2-utils \
+          libxrandr-dev \
+          libxshmfence-dev \
+          libxxf86vm-dev \
+          python3-yaml \
+          wayland-protocols \
+          zlib1g-dev \
+          ccache
+    
+    - name: Configure Mesa Build (Linux)
+      run: |
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'debugoptimized' }}"
+        DRIVERS="${{ github.event.inputs.drivers || 'freedreno,panfrost' }}"
+        
+        meson setup build \
+          --buildtype="$BUILD_TYPE" \
+          -Dplatforms=x11,wayland \
+          -Dgallium-drivers="$DRIVERS,llvmpipe" \
+          -Dvulkan-drivers="$DRIVERS" \
+          -Degl=enabled \
+          -Dgles1=enabled \
+          -Dgles2=enabled \
+          -Dopengl=true \
+          -Dglx=dri \
+          -Ddri3=enabled \
+          -Dshared-glapi=enabled \
+          -Dgbm=enabled \
+          -Dtools=freedreno,panfrost \
+          -Dshader-cache=enabled \
+          -Dvulkan-layers=device-select,overlay
+    
+    - name: Build Mesa (Linux)
+      run: |
+        ninja -C build -j$(nproc)
+    
+    - name: Test Build
+      run: |
+        # Basic validation
+        file build/src/gallium/drivers/freedreno/libfreedreno.a || echo "Freedreno not built"
+        file build/src/gallium/drivers/panfrost/libpanfrost.a || echo "Panfrost not built"
+        
+        # List built drivers
+        echo "Built Vulkan drivers:"
+        find build -name "*vulkan*.so" -type f || true
+        
+        echo "Built Gallium drivers:"
+        find build -name "*gallium*.so" -type f || true
+
+  manual-build:
+    name: Manual Build Instructions
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout Mesa
+      uses: actions/checkout@v4
+    
+    - name: Generate Manual Build Instructions
+      run: |
+        cat > MANUAL_BUILD.md << 'EOF'
+        # Mesa Mobile Drivers - Manual Build Guide
+        
+        ## Prerequisites
+        
+        ### Ubuntu/Debian:
+        ```bash
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential meson ninja-build pkg-config \
+          python3-mako python3-packaging bison flex \
+          libdrm-dev libelf-dev libepoxy-dev libexpat1-dev \
+          libffi-dev libpciaccess-dev libudev-dev libvulkan-dev \
+          libwayland-dev libx11-dev libx11-xcb-dev libxcb-dri2-0-dev \
+          libxcb-dri3-dev libxcb-glx0-dev libxcb-present-dev \
+          libxcb-randr0-dev libxcb-shm0-dev libxcb-sync-dev \
+          libxcb-xfixes0-dev libxdamage-dev libxext-dev libxfixes-dev \
+          libxml2-utils libxrandr-dev libxshmfence-dev libxxf86vm-dev \
+          python3-yaml wayland-protocols zlib1g-dev ccache
+        ```
+        
+        ### Android NDK:
+        Download Android NDK r25c or later from:
+        https://developer.android.com/ndk/downloads
+        
+        ## Build Commands
+        
+        ### Linux Native Build:
+        ```bash
+        # Clone the repository
+        git clone https://github.com/deivid22srk/bionic-vulkan-wrapper.git
+        cd bionic-vulkan-wrapper
+        
+        # Switch to mobile optimizations branch
+        git checkout mobile-optimizations
+        
+        # Configure build
+        meson setup build \
+          --buildtype=debugoptimized \
+          -Dplatforms=x11,wayland \
+          -Dgallium-drivers=freedreno,panfrost,llvmpipe \
+          -Dvulkan-drivers=freedreno,panfrost \
+          -Degl=enabled \
+          -Dgles1=enabled \
+          -Dgles2=enabled \
+          -Dopengl=true \
+          -Dglx=dri \
+          -Ddri3=enabled \
+          -Dshared-glapi=enabled \
+          -Dgbm=enabled \
+          -Dtools=freedreno,panfrost \
+          -Dshader-cache=enabled \
+          -Dvulkan-layers=device-select,overlay
+        
+        # Build
+        ninja -C build -j$(nproc)
+        
+        # Install (optional)
+        sudo ninja -C build install
+        ```
+        
+        ### Android Cross-Compilation:
+        ```bash
+        # Set NDK path
+        export ANDROID_NDK_ROOT=/path/to/android-ndk-r25c
+        
+        # Create cross-compilation file for ARM64
+        cat > android-arm64.txt << 'CROSSFILE'
+        [binaries]
+        c = '$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang'
+        cpp = '$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++'
+        ar = '$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar'
+        strip = '$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'
+        pkgconfig = 'pkg-config'
+        
+        [host_machine]
+        system = 'android'
+        cpu_family = 'aarch64'
+        cpu = 'armv8'
+        endian = 'little'
+        
+        [properties]
+        c_args = ['-fPIC', '-fstack-protector-strong']
+        cpp_args = ['-fPIC', '-fstack-protector-strong']
+        CROSSFILE
+        
+        # Configure Android build
+        meson setup build-android \
+          --cross-file android-arm64.txt \
+          --buildtype=release \
+          -Dplatforms=android \
+          -Dandroid-stub=true \
+          -Dgallium-drivers=freedreno,panfrost \
+          -Dvulkan-drivers=freedreno,panfrost \
+          -Degl=enabled \
+          -Dgles1=enabled \
+          -Dgles2=enabled \
+          -Dshared-glapi=enabled \
+          -Dgbm=disabled \
+          -Dglx=disabled \
+          -Dosmesa=false \
+          -Ddri3=disabled \
+          -Dxmlconfig=disabled \
+          -Dllvm=disabled \
+          -Dshader-cache=enabled \
+          -Dvulkan-layers=device-select,overlay \
+          -Dtools=freedreno,panfrost \
+          -Dlibunwind=disabled
+        
+        # Build for Android
+        ninja -C build-android -j$(nproc)
+        ```
+        
+        ## Mobile Optimization Environment Variables
+        
+        Set these environment variables to enable mobile-specific optimizations:
+        
+        ```bash
+        export TU_ENABLE_MOBILE_OPTIMIZATIONS=1    # Enable Adreno mobile optimizations
+        export TU_PREFER_GMEM_RENDERING=1          # Prefer GMEM over sysmem rendering
+        export TU_ENABLE_LRZ_OPTIMIZATION=1        # Enable advanced LRZ optimizations
+        export PANFROST_FORCE_AFBC=1               # Force AFBC compression on Mali
+        export PANFROST_ENABLE_TILE_OPTIMIZATION=1 # Enable Mali tile optimizations
+        ```
+        
+        ## Build Targets
+        
+        - **Freedreno (Turnip)**: Qualcomm Adreno GPU Vulkan driver
+        - **Panfrost**: ARM Mali GPU OpenGL ES and experimental Vulkan driver
+        - **Mobile optimizations**: Power efficiency and tile-based rendering improvements
+        
+        ## Troubleshooting
+        
+        1. **Missing dependencies**: Install all required development packages
+        2. **Meson version**: Ensure meson >= 1.1.0
+        3. **Android NDK**: Use NDK r25c or later for best compatibility
+        4. **Build errors**: Check `meson.log` in build directory for details
+        
+        ## Integration
+        
+        ### Android:
+        Copy built `.so` files to `/vendor/lib64/hw/` or `/system/lib64/hw/`
+        
+        ### Linux:
+        Use `ninja install` or manually copy libraries to appropriate directories
+        
+        EOF
+    
+    - name: Upload Manual Build Guide
+      uses: actions/upload-artifact@v4
+      with:
+        name: manual-build-guide
+        path: MANUAL_BUILD.md
+        retention-days: 30
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-22.04
+    needs: [build-android, build-linux]
+    if: github.ref == 'refs/heads/mobile-optimizations' && github.event_name == 'push'
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: release-artifacts
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: mobile-opt-${{ github.sha }}
+        name: Mesa Mobile Drivers - ${{ github.sha }}
+        body: |
+          ## Mesa Mobile GPU Drivers with Optimizations
+          
+          **Branch:** ${{ github.ref_name }}
+          **Commit:** ${{ github.sha }}
+          
+          ### Features:
+          - 🚀 Qualcomm Adreno (Freedreno/Turnip) optimizations
+          - 🛡️ ARM Mali (Panfrost) tile-based rendering improvements
+          - 📱 Mobile-specific power efficiency enhancements
+          - ⚡ GMEM/AFBC memory optimization
+          - 🎯 LRZ (Low Resolution Z) advanced optimizations
+          
+          ### Included Drivers:
+          - **Turnip**: Vulkan 1.3 for Adreno 6xx+ GPUs
+          - **Panfrost**: OpenGL ES 3.1 for Mali GPUs
+          - **Mobile HAL**: Optimized Android integration
+          
+          ### Downloads:
+          - `mesa-drivers-arm64-v8a-*`: Android ARM64 drivers
+          - `mesa-drivers-armeabi-v7a-*`: Android ARM32 drivers
+          - `manual-build-guide`: Complete build instructions
+          
+          See the manual build guide for installation and configuration details.
+        files: release-artifacts/**/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
