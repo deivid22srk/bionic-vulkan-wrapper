@@ -87,7 +87,11 @@ jobs:
           python3-ply \
           python3-yaml \
           zlib1g-dev \
-          ccache
+          ccache \
+          glslang-tools \
+          libvulkan-dev \
+          vulkan-validationlayers-dev \
+          spirv-tools
     
     - name: Install Modern Meson
       run: |

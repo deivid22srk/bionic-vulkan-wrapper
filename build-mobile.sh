@@ -280,7 +280,11 @@ install_dependencies() {
         python3-pip \
         zlib1g-dev \
         ccache \
-        curl
+        curl \
+        glslang-tools \
+        libvulkan-dev \
+        vulkan-validationlayers-dev \
+        spirv-tools
     
     # Install latest meson
     log_info "Installing latest Meson..."

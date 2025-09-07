@@ -120,7 +120,11 @@ jobs:
           zlib1g-dev \
           ccache \
           curl \
-          python3-pip
+          python3-pip \
+          glslang-tools \
+          libvulkan-dev \
+          vulkan-validationlayers-dev \
+          spirv-tools
     
     - name: Install Latest Meson
       run: |

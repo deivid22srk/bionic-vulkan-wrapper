@@ -119,7 +119,8 @@ sudo apt-get update
 sudo apt-get install -y build-essential bison flex gettext libedit-dev \
     libelf-dev libexpat1-dev libffi-dev libudev-dev libxml2-utils \
     ninja-build pkg-config python3-mako python3-packaging python3-ply \
-    python3-yaml python3-pip zlib1g-dev ccache curl
+    python3-yaml python3-pip zlib1g-dev ccache curl glslang-tools \
+    libvulkan-dev vulkan-validationlayers-dev spirv-tools
 
 # Install latest Meson (fixes version issues)
 pip3 install --user --upgrade meson>=1.1.0
@@ -276,6 +277,14 @@ export PATH="$HOME/.local/bin:$PATH"
 ```
 
 #### 2. **Build Errors**
+```bash
+# Error: Program 'glslangValidator' not found or not executable
+sudo apt-get install glslang-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools
+
+# Error: Meson version is 0.61.2 but project requires >= 1.1.0
+pip3 install --user --upgrade meson>=1.1.0
+export PATH="$HOME/.local/bin:$PATH"
+```
 - Check `build/meson-logs/meson-log.txt` for details
 - Ensure Android NDK r25c or later
 - Verify all dependencies are installed: `./build-mobile.sh --install-deps`
