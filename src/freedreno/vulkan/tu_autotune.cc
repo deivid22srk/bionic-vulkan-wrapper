@@ -610,7 +610,18 @@ tu_autotune_use_bypass(struct tu_autotune *at,
        */
       gmem_bandwidth = (gmem_bandwidth * 11 + total_draw_call_bandwidth) / 10;
 
-      const bool select_sysmem = sysmem_bandwidth <= gmem_bandwidth;
+      bool select_sysmem = sysmem_bandwidth <= gmem_bandwidth;
+      
+      /* Mobile optimization: Prefer GMEM rendering for better power efficiency */
+      const char *mobile_opt = getenv("TU_ENABLE_MOBILE_OPTIMIZATIONS");
+      const char *prefer_gmem = getenv("TU_PREFER_GMEM_RENDERING");
+      if ((mobile_opt && strcmp(mobile_opt, "1") == 0) ||
+          (prefer_gmem && strcmp(prefer_gmem, "1") == 0)) {
+         /* On mobile devices, favor GMEM unless sysmem is significantly better */
+         const float mobile_gmem_bias = 1.25f; /* 25% bias toward GMEM */
+         select_sysmem = (sysmem_bandwidth * mobile_gmem_bias) <= gmem_bandwidth;
+      }
+      
       if (TU_AUTOTUNE_DEBUG_LOG) {
          const VkExtent2D *extent = &cmd_buffer->state.render_area.extent;
          const float drawcall_bandwidth_per_sample =

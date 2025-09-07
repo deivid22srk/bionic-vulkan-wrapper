@@ -58,6 +58,29 @@ tu_lrz_disable_reason(struct tu_cmd_buffer *cmd, const char *reason) {
    perf_debug(cmd->device, "Disabling LRZ because '%s'", reason);
 }
 
+/* Mobile-specific LRZ optimization hints */
+static inline bool
+tu_lrz_should_force_enable_mobile(struct tu_cmd_buffer *cmd) {
+   /* Force enable LRZ on mobile if environment suggests it and we're in mobile mode */
+   const char *mobile_opt = getenv("TU_ENABLE_MOBILE_OPTIMIZATIONS");
+   const char *lrz_opt = getenv("TU_ENABLE_LRZ_OPTIMIZATION");
+   
+   if (mobile_opt && strcmp(mobile_opt, "1") == 0 &&
+       lrz_opt && strcmp(lrz_opt, "1") == 0) {
+      /* Override some disable reasons on mobile for better performance */
+      if (cmd->state.rp.lrz_disable_reason) {
+         const char *reason = cmd->state.rp.lrz_disable_reason;
+         /* Allow LRZ on mobile for small renderpasses even with secondary command buffers */
+         if (strstr(reason, "secondary command") && cmd->state.render_area.extent.width <= 1024) {
+            perf_debug(cmd->device, "Mobile: Re-enabling LRZ for small secondary command buffer");
+            return true;
+         }
+      }
+   }
+   
+   return false;
+}
+
 template <chip CHIP>
 static void
 tu6_emit_lrz_buffer(struct tu_cs *cs, struct tu_image *depth_image)
@@ -74,6 +97,14 @@ tu6_emit_lrz_buffer(struct tu_cs *cs, struct tu_image *depth_image)
       return;
    }
 
+   /* Mobile optimization: Prefer smaller LRZ pitch for better cache utilization */
+   const char *mobile_opt = getenv("TU_ENABLE_MOBILE_OPTIMIZATIONS");
+   uint32_t lrz_pitch = depth_image->lrz_pitch;
+   if (mobile_opt && strcmp(mobile_opt, "1") == 0) {
+      /* Align pitch to smaller boundaries on mobile for better memory efficiency */
+      lrz_pitch = ALIGN(lrz_pitch, 32); /* Smaller alignment for mobile */
+   }
+
    uint64_t lrz_iova = depth_image->iova + depth_image->lrz_offset;
    uint64_t lrz_fc_iova = depth_image->iova + depth_image->lrz_fc_offset;
    if (!depth_image->lrz_fc_offset)
@@ -81,7 +112,7 @@ tu6_emit_lrz_buffer(struct tu_cs *cs, struct tu_image *depth_image)
 
    tu_cs_emit_regs(cs,
                    A6XX_GRAS_LRZ_BUFFER_BASE(.qword = lrz_iova),
-                   A6XX_GRAS_LRZ_BUFFER_PITCH(.pitch = depth_image->lrz_pitch),
+                   A6XX_GRAS_LRZ_BUFFER_PITCH(.pitch = lrz_pitch),
                    A6XX_GRAS_LRZ_FAST_CLEAR_BUFFER_BASE(.qword = lrz_fc_iova));
 
    if (CHIP >= A7XX) {

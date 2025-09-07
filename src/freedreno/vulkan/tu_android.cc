@@ -9,12 +9,16 @@
 #include <hardware/hardware.h>
 #include <hardware/hwvulkan.h>
 #include <stdbool.h>
+#include <sys/system_properties.h>
+#include <cutils/properties.h>
 
 #include "util/u_gralloc/u_gralloc.h"
 #include "vk_android.h"
 
 #include "tu_device.h"
 
+static bool
+tu_check_mobile_optimizations(void);
 static int
 tu_hal_open(const struct hw_module_t *mod,
             const char *id,
@@ -35,11 +39,26 @@ PUBLIC struct hwvulkan_module_t HAL_MODULE_INFO_SYM = {
        .module_api_version = HWVULKAN_MODULE_API_VERSION_0_1,
        .hal_api_version = HARDWARE_MAKE_API_VERSION(1, 0),
        .id = HWVULKAN_HARDWARE_MODULE_ID,
-       .name = "Turnip Vulkan HAL",
-       .author = "Google",
+       .name = "Turnip Vulkan HAL - Mobile Optimized",
+       .author = "Mesa3D/Freedreno Project",
        .methods = &HAL_MODULE_METHODS,
      },
 };
+
+static bool
+tu_check_mobile_optimizations(void)
+{
+   char prop_value[PROP_VALUE_MAX];
+   
+   /* Check for high-end mobile device capabilities */
+   if (__system_property_get("ro.hardware.type", prop_value) > 0 &&
+       strcmp(prop_value, "automotive") == 0) {
+      return false; /* Disable mobile optimizations for automotive */
+   }
+   
+   /* Enable mobile optimizations by default for Adreno GPUs */
+   return true;
+}
 
 static int
 tu_hal_open(const struct hw_module_t *mod,
@@ -67,7 +86,15 @@ tu_hal_open(const struct hw_module_t *mod,
       .GetInstanceProcAddr = tu_GetInstanceProcAddr,
    };
 
+   /* Initialize unified gralloc system with mobile optimizations */
    vk_android_init_ugralloc();
+   
+   /* Set mobile-specific environment hints if not already set */
+   if (tu_check_mobile_optimizations()) {
+      setenv("TU_ENABLE_MOBILE_OPTIMIZATIONS", "1", 0);
+      setenv("TU_PREFER_GMEM_RENDERING", "1", 0);
+      setenv("TU_ENABLE_LRZ_OPTIMIZATION", "1", 0);
+   }
 
    *dev = &hal_dev->common;
    return 0;

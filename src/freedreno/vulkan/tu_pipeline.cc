@@ -279,6 +279,7 @@ struct tu_pipeline_builder
    VkShaderStageFlags active_stages;
 
    bool fragment_density_map;
+   bool enable_mobile_power_optimizations;
 
    struct vk_graphics_pipeline_all_state all_state;
    struct vk_graphics_pipeline_state graphics_state;
@@ -4143,6 +4144,13 @@ tu_graphics_pipeline_create(VkDevice device,
    struct tu_pipeline_builder builder;
    tu_pipeline_builder_init_graphics(&builder, dev, cache,
                                      pCreateInfo, flags, pAllocator);
+
+   /* Mobile power efficiency optimizations */
+   const char *mobile_opt = getenv("TU_ENABLE_MOBILE_OPTIMIZATIONS");
+   if (mobile_opt && strcmp(mobile_opt, "1") == 0) {
+      /* Hint to prefer lower power shader variants where possible */
+      builder.enable_mobile_power_optimizations = true;
+   }
 
    struct tu_pipeline *pipeline = NULL;
    VkResult result = tu_pipeline_builder_build<CHIP>(&builder, &pipeline);

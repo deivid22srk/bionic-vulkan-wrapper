@@ -619,6 +619,14 @@ tu_render_pass_gmem_config(struct tu_render_pass *pass,
       uint32_t gmem_size = layout == TU_GMEM_LAYOUT_FULL
                               ? phys_dev->usable_gmem_size_gmem
                               : phys_dev->ccu_offset_gmem;
+                              
+      /* Mobile optimization: Reduce GMEM pressure for small viewports */
+      const char *mobile_opt = getenv("TU_ENABLE_MOBILE_OPTIMIZATIONS");
+      if (mobile_opt && strcmp(mobile_opt, "1") == 0) {
+         /* For mobile, use more conservative GMEM allocation to improve cache efficiency */
+         gmem_size = (gmem_size * 3) / 4; /* Use 75% of available GMEM for better power efficiency */
+      }
+      
       uint32_t gmem_blocks = gmem_size / gmem_align;
       uint32_t offset = 0, pixels = ~0u, i;
       for (i = 0; i < pass->attachment_count; i++) {
