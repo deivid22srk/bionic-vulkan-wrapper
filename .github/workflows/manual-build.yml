@@ -42,7 +42,7 @@ jobs:
         run: |
           cd bionic-vulkan-wrapper
           mkdir -p build && cd build
-          meson setup .. \
+          CC=clang CXX=clang++ meson setup .. \
             --buildtype=${{ github.event.inputs.build_type }} \
             -Dllvm=disabled \
             -Dvulkan-drivers=[] \
@@ -53,7 +53,7 @@ jobs:
       - name: Build wrapper
         run: |
           cd bionic-vulkan-wrapper/build
-          ninja
+          CC=clang CXX=clang++ ninja
 
       - name: Upload compiled driver
         uses: actions/upload-artifact@v4
