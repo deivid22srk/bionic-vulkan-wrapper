@@ -27,7 +27,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt update
-          sudo apt install -y python3 python3-pip git ninja-build meson clang libx11-dev libxcb1-dev xorg-dev
+          sudo apt install -y python3 python3-pip git ninja-build meson clang libx11-dev libxcb1-dev xorg-dev glslang-tools
 
       - name: Install Meson
         run: pip install --upgrade meson
