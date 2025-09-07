@@ -21,39 +21,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout do repositório atual
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      # 2. Instalar dependências básicas
       - name: Install dependencies
         run: |
           sudo apt update && sudo apt install -y \
             git clang build-essential python3 python3-pip meson ninja-build cmake pkg-config \
             libvulkan-dev vulkan-tools libclc-dev
 
-      # 3. Clonar repositórios necessários
       - name: Clone repositories
         run: |
           git clone https://github.com/leegao/vulkan_wrapper_termux-packages.git
           git clone https://github.com/deivid22srk/bionic-vulkan-wrapper.git
 
-      # 4. Criar diretório build e configurar Meson
       - name: Configure build
         run: |
           cd bionic-vulkan-wrapper
           mkdir -p build && cd build
           meson .. --buildtype=${{ github.event.inputs.build_type }}
 
-      # 5. Compilar com Ninja
       - name: Build wrapper
         run: |
           cd bionic-vulkan-wrapper/build
           ninja
 
-      # 6. Salvar os binários compilados como artefato
       - name: Upload compiled driver
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: bionic-vulkan-wrapper-driver
           path: bionic-vulkan-wrapper/build/*
