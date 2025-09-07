@@ -101,11 +101,26 @@ EXAMPLES:
 
 ENVIRONMENT VARIABLES:
     The script will set these for mobile optimization builds:
+    
+    Qualcomm Adreno (Turnip) optimizations:
     - TU_ENABLE_MOBILE_OPTIMIZATIONS=1
-    - TU_PREFER_GMEM_RENDERING=1
+    - TU_PREFER_GMEM_RENDERING=1  
     - TU_ENABLE_LRZ_OPTIMIZATION=1
+    - TU_GMEM_HEURISTICS_AGGRESSIVE=1
+    - TU_DEBUG_GMEM_PREFER=1
+    - TU_DEBUG_CONSERVATIVE_LRZ=1
+    
+    ARM Mali (Panfrost) optimizations:
     - PANFROST_FORCE_AFBC=1
     - PANFROST_ENABLE_TILE_OPTIMIZATION=1
+    - PANFROST_DBG_AFBC=1
+    - PANFROST_DBG_TILING=1
+    - PANFROST_DEBUG_CONSERVATIVE_MEM=1
+    
+    General Mesa mobile optimizations:
+    - MESA_LOADER_DRIVER_OVERRIDE=turnip,panfrost
+    - MESA_DEBUG_MOBILE=1
+    - ENABLE_GPU_POWER_HINTS=1
 
 ANDROID NDK:
     Download from: https://developer.android.com/ndk/downloads
@@ -307,11 +322,31 @@ mkdir -p "$OUTPUT_DIR"
 # Set up mobile optimization environment variables
 if [[ "$BUILD_TYPE" == "mobile" ]]; then
     log_info "Enabling mobile optimization environment variables"
+    
+    # Qualcomm Adreno (Turnip Vulkan Driver) optimizations
     export TU_ENABLE_MOBILE_OPTIMIZATIONS=1
     export TU_PREFER_GMEM_RENDERING=1
     export TU_ENABLE_LRZ_OPTIMIZATION=1
+    export TU_GMEM_HEURISTICS_AGGRESSIVE=1
+    export TU_DEBUG_GMEM_PREFER=1
+    export TU_DEBUG_CONSERVATIVE_LRZ=1
+    
+    # ARM Mali (Panfrost) optimizations  
     export PANFROST_FORCE_AFBC=1
     export PANFROST_ENABLE_TILE_OPTIMIZATION=1
+    export PANFROST_DBG_AFBC=1
+    export PANFROST_DBG_TILING=1
+    export PANFROST_DEBUG_CONSERVATIVE_MEM=1
+    
+    # General Mesa mobile optimizations
+    export MESA_LOADER_DRIVER_OVERRIDE=turnip,panfrost
+    export MESA_DEBUG_MOBILE=1
+    export MESA_GLES_VERSION_OVERRIDE=3.2
+    export MESA_GLSL_VERSION_OVERRIDE=320
+    
+    # Power efficiency settings
+    export GPU_FORCE_64BIT_PTR=0
+    export ENABLE_GPU_POWER_HINTS=1
 fi
 
 # Create cross-compilation file for Android
@@ -368,10 +403,10 @@ cpu = '$cpu'
 endian = 'little'
 
 [built-in options]
-c_args = ['-fPIC', '-fstack-protector-strong', '-ffunction-sections', '-fdata-sections', '-Os']
-cpp_args = ['-fPIC', '-fstack-protector-strong', '-ffunction-sections', '-fdata-sections', '-Os']
-c_link_args = ['-Wl,--gc-sections', '-Wl,--as-needed', '-Wl,--strip-all']
-cpp_link_args = ['-Wl,--gc-sections', '-Wl,--as-needed', '-Wl,--strip-all']
+c_args = ['-fPIC', '-fstack-protector-strong', '-ffunction-sections', '-fdata-sections', '-Os', '-ffast-math', '-fno-strict-aliasing', '-DANDROID_MOBILE_OPTIMIZATIONS=1']
+cpp_args = ['-fPIC', '-fstack-protector-strong', '-ffunction-sections', '-fdata-sections', '-Os', '-ffast-math', '-fno-strict-aliasing', '-DANDROID_MOBILE_OPTIMIZATIONS=1']
+c_link_args = ['-Wl,--gc-sections', '-Wl,--as-needed', '-Wl,--strip-all', '-Wl,--hash-style=gnu', '-Wl,-z,relro']
+cpp_link_args = ['-Wl,--gc-sections', '-Wl,--as-needed', '-Wl,--strip-all', '-Wl,--hash-style=gnu', '-Wl,-z,relro']
 EOF
     
     log_success "Created cross-compilation file: $cross_file"
@@ -409,6 +444,13 @@ configure_build() {
                 "-Db_lto=true"
                 "-Db_ndebug=if-release"
                 "-Doptimization=2"
+                "-Db_sanitize=none"
+                "-Dstrip=true"
+                "-Db_asneeded=true"
+                "-Db_pie=true"
+                "-Dprefer-iris=false"
+                "-Dsse2=false"
+                "-Dasm=true"
             )
             ;;
         "performance")
@@ -613,6 +655,10 @@ EOF
 # Enable mobile optimizations
 adb shell "su -c 'setprop debug.mesa.mobile_opt 1'"
 adb shell "su -c 'setprop debug.mesa.gmem_prefer 1'"
+adb shell "su -c 'setprop debug.mesa.tile_opt 1'"
+adb shell "su -c 'setprop debug.mesa.power_hints 1'"
+adb shell "su -c 'setprop debug.turnip.gmem_aggressive 1'"
+adb shell "su -c 'setprop debug.panfrost.afbc 1'"
 EOF
     fi
 
@@ -634,14 +680,25 @@ adb shell dumpsys SurfaceFlinger | grep -i mesa
 If you have root shell access, you can set these environment variables for enhanced performance:
 
 \`\`\`bash
-# Adreno optimizations
+# Qualcomm Adreno (Turnip) optimizations
 export TU_ENABLE_MOBILE_OPTIMIZATIONS=1
 export TU_PREFER_GMEM_RENDERING=1
 export TU_ENABLE_LRZ_OPTIMIZATION=1
+export TU_GMEM_HEURISTICS_AGGRESSIVE=1
+export TU_DEBUG_GMEM_PREFER=1
+export TU_DEBUG_CONSERVATIVE_LRZ=1
 
-# Mali optimizations
+# ARM Mali (Panfrost) optimizations
 export PANFROST_FORCE_AFBC=1
 export PANFROST_ENABLE_TILE_OPTIMIZATION=1
+export PANFROST_DBG_AFBC=1
+export PANFROST_DBG_TILING=1
+export PANFROST_DEBUG_CONSERVATIVE_MEM=1
+
+# General Mesa mobile optimizations
+export MESA_LOADER_DRIVER_OVERRIDE=turnip,panfrost
+export MESA_DEBUG_MOBILE=1
+export ENABLE_GPU_POWER_HINTS=1
 \`\`\`
 
 ## Recovery
@@ -734,6 +791,10 @@ if [[ "$BUILD_TYPE" == "mobile" ]]; then
   echo "📱 Enabling mobile optimizations..."
   adb shell "su -c 'setprop debug.mesa.mobile_opt 1'"
   adb shell "su -c 'setprop debug.mesa.gmem_prefer 1'"
+  adb shell "su -c 'setprop debug.mesa.tile_opt 1'"
+  adb shell "su -c 'setprop debug.mesa.power_hints 1'"
+  adb shell "su -c 'setprop debug.turnip.gmem_aggressive 1'"
+  adb shell "su -c 'setprop debug.panfrost.afbc 1'"
 fi
 
 # Cleanup

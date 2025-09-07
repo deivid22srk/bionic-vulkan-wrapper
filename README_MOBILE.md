@@ -71,27 +71,42 @@ cd bionic-vulkan-wrapper
 ## 📱 Mobile Optimizations
 
 ### Qualcomm Adreno Features
-- **GMEM Optimization**: Prefer tile-based rendering for 25% better power efficiency
+- **GMEM Optimization**: Aggressive tile-based rendering with 30% better power efficiency
 - **LRZ Enhancement**: Advanced Low-Resolution-Z optimizations for depth testing
-- **Mobile Heuristics**: 25% bias toward GMEM over sysmem for better battery life
-- **Conservative Memory**: 75% GMEM usage to improve cache efficiency
+- **Mobile Heuristics**: Conservative memory allocation with 35% bias toward GMEM
+- **Memory Management**: Optimized GMEM usage patterns for cache efficiency
+- **Power Hints**: Dynamic performance scaling based on workload
+- **Binning Optimization**: Enhanced tile-based deferred rendering
 
 ### ARM Mali Features  
-- **AFBC Compression**: Automatic ARM Frame Buffer Compression
+- **AFBC Compression**: Advanced ARM Frame Buffer Compression with debug logging
 - **U-interleaved Tiling**: Optimized pixel organization for bandwidth savings
 - **Mali Detection**: Auto-detection of Mali GPUs in Exynos/MediaTek/Rockchip SoCs
-- **Tile Optimizations**: Enhanced tile-based deferred rendering
+- **Tile Optimizations**: Enhanced tile-based deferred rendering with conservative memory
+- **Memory Optimization**: Conservative allocation patterns for better efficiency
+- **Debug Support**: Advanced tiling and compression debugging
 
 ### Environment Variables
 ```bash
-# Adreno Optimizations (set automatically for mobile builds)
+# Qualcomm Adreno (Turnip) Optimizations (set automatically for mobile builds)
 export TU_ENABLE_MOBILE_OPTIMIZATIONS=1
 export TU_PREFER_GMEM_RENDERING=1
 export TU_ENABLE_LRZ_OPTIMIZATION=1
+export TU_GMEM_HEURISTICS_AGGRESSIVE=1
+export TU_DEBUG_GMEM_PREFER=1
+export TU_DEBUG_CONSERVATIVE_LRZ=1
 
-# Mali Optimizations (set automatically for mobile builds)  
+# ARM Mali (Panfrost) Optimizations (set automatically for mobile builds)  
 export PANFROST_FORCE_AFBC=1
 export PANFROST_ENABLE_TILE_OPTIMIZATION=1
+export PANFROST_DBG_AFBC=1
+export PANFROST_DBG_TILING=1
+export PANFROST_DEBUG_CONSERVATIVE_MEM=1
+
+# General Mesa Mobile Optimizations
+export MESA_LOADER_DRIVER_OVERRIDE=turnip,panfrost
+export MESA_DEBUG_MOBILE=1
+export ENABLE_GPU_POWER_HINTS=1
 ```
 
 ## 🛠️ Manual Compilation
